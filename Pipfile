@@ -1,0 +1,26 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+torch = "*"
+lightning = "*"
+numpy = "*"
+pandas = "*"
+torchvision = "*"
+torchmetrics = "*"
+tensorboard = "*"
+matplotlib = "*"
+scikit-learn = "*"
+
+[dev-packages]
+ipykernel = "*"
+black = "*"
+isort = "*"
+mypy = "*"
+flake8 = "*"
+torch-tb-profiler = "*"
+
+[requires]
+python_version = "3.12"

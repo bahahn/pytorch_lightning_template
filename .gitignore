@@ -1,0 +1,7 @@
+csv_logs/
+lightning_logs/
+data/
+.venv/
+models/
+__pycache__
+.DS_Store
