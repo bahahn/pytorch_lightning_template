@@ -37,18 +37,25 @@ from lightning.pytorch.callbacks import (
     LearningRateMonitor,
     ModelCheckpoint,
     ModelSummary,
+    TQDMProgressBar,
 )
 
 
 from source.python.dataset.dataset_regression import DatasetHandler
+from source.python.configs.config_reader import read_yml_to_dict
 
 
 # %%
 class LinearNN(LightningModule):
 
-    def __init__(self, num_features_in: int):
+    def __init__(self, hparams_dict: dict = {}):
         super(LinearNN, self).__init__()
-        self.fc1 = nn.Linear(num_features_in, 256)
+
+        # Hyperparameters
+        self.hparams_dict = hparams_dict
+        self.save_hyperparameters(hparams_dict, logger=True)
+
+        self.fc1 = nn.Linear(self.hparams_dict["num_features_in"], 256)
         self.fc2 = nn.Linear(256, 512)
         self.fc3 = nn.Linear(512, 1024)
         self.fc4 = nn.Linear(1024, 2048)
@@ -81,18 +88,20 @@ class LinearNN(LightningModule):
 
     def configure_optimizers(self):
         self.optimizer = torch.optim.AdamW(
-            self.parameters(), lr=0.0005, weight_decay=0.001
+            self.parameters(),
+            lr=self.hparams_dict["optimizer"]["lr"],
+            weight_decay=self.hparams_dict["optimizer"]["weight_decay"],
         )
         self.scheduler = {
             "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
                 self.optimizer,
                 mode="min",
-                factor=0.2,
-                patience=2,
+                factor=self.hparams_dict["scheduler"]["factor"],
+                patience=self.hparams_dict["scheduler"]["patience"],
                 min_lr=1e-6,
                 verbose=True,
             ),
-            "monitor": "validation_mse_epoch",
+            "monitor": self.hparams_dict["scheduler"]["monitor"],
         }
 
         return [self.optimizer], [self.scheduler]
@@ -132,17 +141,21 @@ class LinearNN(LightningModule):
 
 
 # %%
-
+config_dict = read_yml_to_dict("source/python/configs/params.yaml")
+config_dict["num_features_in"] = 6
 
 # %%
-dataset_handler = DatasetHandler("./data/Student_Performance.csv")
+dataset_handler = DatasetHandler(
+    "./data/Student_Performance.csv", batch_size=config_dict["batch_size"]
+)
 dataset_handler.columns
 
 # %%
-model = LinearNN(num_features_in=6)
+model = LinearNN(hparams_dict=config_dict)
+
 # %%
 # Logger
-logger = TensorBoardLogger("lightning_logs", "LNN")
+logger = TensorBoardLogger("logs/lightning_logs", config_dict["model_name"])
 metrics = {}
 for metric in list(model.base_metrics.keys()):
     metrics[metric] = [
@@ -153,13 +166,16 @@ for metric in list(model.base_metrics.keys()):
 tensorboard_layout = {"Statistics": metrics}
 logger.experiment.add_custom_scalars(tensorboard_layout)
 
-csv_logger = CSVLogger("csv_logs", "LNN")
+csv_logger = CSVLogger("logs/csv_logs", config_dict["model_name"])
 
 # %%
-early_stopping = EarlyStopping(monitor="validation_mse_epoch", patience=6)
+early_stopping = EarlyStopping(
+    monitor=config_dict["early_stopping"]["monitor"],
+    patience=config_dict["early_stopping"]["patience"],
+)
 
 checkpoint_callback = ModelCheckpoint(
-    dirpath=os.getcwd() + "/models/LNN/",
+    dirpath=os.getcwd() + f"/models/{config_dict["model_name"]}/",
     save_top_k=1,
     verbose=True,
     monitor="validation_mse_epoch",
@@ -168,10 +184,12 @@ checkpoint_callback = ModelCheckpoint(
 
 lr_logger = LearningRateMonitor()
 
+tqdm_bar = TQDMProgressBar(leave=True)
+
 
 # %%
 trainer = pl.Trainer(
-    max_epochs=50,
+    max_epochs=config_dict["num_max_epochs"],
     enable_progress_bar=True,
     benchmark=True,
     fast_dev_run=False,
@@ -182,6 +200,7 @@ trainer = pl.Trainer(
         early_stopping,
         checkpoint_callback,
         lr_logger,
+        tqdm_bar,
         ModelSummary(max_depth=1),
     ],
     accelerator="mps",
@@ -189,14 +208,40 @@ trainer = pl.Trainer(
 trainer.fit(model, dataset_handler.train_loader, dataset_handler.val_loader)
 
 # %%
-
-# %%
+model.eval()
 trainer.test(model, dataset_handler.test_loader)
 
-# %%
-x_1, y_1 = dataset_handler.test_dataset[23]
 
-y_pred = model.forward(x_1)
+# %%
+# Save model
+torch.save(
+    model.state_dict(),
+    f"./models/{config_dict["model_name"]}/{config_dict["model_name"]}_final.pt",
+)
+
+# Save model structure
+torch.save(
+    model,
+    f"./models/{config_dict["model_name"]}/{config_dict["model_name"]}_final_full.pt",
+)
+
+
+# %%
+model = LinearNN(hparams_dict=config_dict)
+model.load_state_dict(
+    torch.load(
+        f"./models/{config_dict["model_name"]}/{config_dict["model_name"]}_final.pt"
+    )
+)
+model.eval()
+# %%
+
+# %%
+
+# %%
+x_1, y_1 = dataset_handler.test_dataset[10]
+
+y_pred = model(x_1)
 print("True: ", y_1)
 print(
     "Predicted: ",

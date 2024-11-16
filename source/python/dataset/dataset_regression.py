@@ -78,7 +78,7 @@ class CustomRegressionDataset(Dataset):
 
 
 class DatasetHandler:
-    def __init__(self, dataset_path: str):
+    def __init__(self, dataset_path: str, batch_size: int = 128):
         self.dataset = CustomRegressionDataset(dataset_path=dataset_path)
         self.columns = self.dataset.X.columns
 
@@ -92,11 +92,15 @@ class DatasetHandler:
 
         self.train_loader = DataLoader(
             self.train_dataset,
-            batch_size=128,
+            batch_size=batch_size,
             shuffle=True,
         )
-        self.val_loader = DataLoader(self.val_dataset, batch_size=128, shuffle=False)
-        self.test_loader = DataLoader(self.test_dataset, batch_size=128, shuffle=False)
+        self.val_loader = DataLoader(
+            self.val_dataset, batch_size=batch_size, shuffle=False
+        )
+        self.test_loader = DataLoader(
+            self.test_dataset, batch_size=batch_size, shuffle=False
+        )
 
     def get_train_val_test_split(self):
         return self.train_dataset, self.val_dataset, self.test_dataset
