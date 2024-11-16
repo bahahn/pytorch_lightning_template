@@ -146,7 +146,8 @@ config_dict["num_features_in"] = 6
 
 # %%
 dataset_handler = DatasetHandler(
-    "./data/Student_Performance.csv", batch_size=config_dict["batch_size"]
+    "./data/Student_Performance/Student_Performance",
+    batch_size=config_dict["batch_size"],
 )
 dataset_handler.columns
 
@@ -239,7 +240,7 @@ model.eval()
 # %%
 
 # %%
-x_1, y_1 = dataset_handler.test_dataset[10]
+x_1, y_1 = dataset_handler.test_dataset[42]
 
 y_pred = model(x_1)
 print("True: ", y_1)

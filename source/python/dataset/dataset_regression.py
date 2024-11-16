@@ -10,20 +10,40 @@ from torch.utils.data.dataset import Dataset  # For custom datasets
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
+
+
+# %%
+# Train Validate Test Split
+df = pd.read_csv("./data/Student_Performance/Student_Performance.csv")
+
+df_train, df_test = train_test_split(df, test_size=0.3, random_state=42)
+df_val, df_test = train_test_split(df_test, test_size=0.5, random_state=42)
+
+df_train.to_csv("./data/Student_Performance/Student_Performance_train.csv", index=False)
+df_val.to_csv("./data/Student_Performance/Student_Performance_val.csv", index=False)
+df_test.to_csv("./data/Student_Performance/Student_Performance_test.csv", index=False)
 
 
 # %%
 class CustomRegressionDataset(Dataset):
-    def __init__(self, dataset_path: str):
+    def __init__(
+        self,
+        dataset_path: str,
+        column_transformer: ColumnTransformer = None,
+    ):
         self.path = dataset_path
 
         # Read in .csv as pandas
-        self.df = pd.read_csv("./data/Student_Performance.csv")
+        self.df = pd.read_csv(self.path)
 
         self.X = self.df.drop(columns=["Performance Index"])
         self.y = self.df["Performance Index"]
 
-        self.prepare_column_transformer()
+        if column_transformer is None:
+            self.prepare_column_transformer()
+        else:
+            self.preprocessor = column_transformer
 
     def __len__(self):
         return len(self.X)
@@ -79,16 +99,19 @@ class CustomRegressionDataset(Dataset):
 
 class DatasetHandler:
     def __init__(self, dataset_path: str, batch_size: int = 128):
-        self.dataset = CustomRegressionDataset(dataset_path=dataset_path)
-        self.columns = self.dataset.X.columns
-
-        self.train_size = int(0.6 * len(self.dataset))
-        self.val_size = int(0.2 * len(self.dataset))
-        self.test_size = len(self.dataset) - self.train_size - self.val_size
-
-        self.train_dataset, self.val_dataset, self.test_dataset = random_split(
-            self.dataset, [self.train_size, self.val_size, self.test_size]
+        self.train_dataset = CustomRegressionDataset(
+            dataset_path=dataset_path + "_train.csv"
         )
+        self.val_dataset = CustomRegressionDataset(
+            dataset_path=dataset_path + "_val.csv",
+            column_transformer=self.train_dataset.preprocessor,
+        )
+        self.test_dataset = CustomRegressionDataset(
+            dataset_path=dataset_path + "_test.csv",
+            column_transformer=self.train_dataset.preprocessor,
+        )
+
+        self.columns = self.train_dataset.X.columns
 
         self.train_loader = DataLoader(
             self.train_dataset,
@@ -110,9 +133,11 @@ class DatasetHandler:
 
 
 # %%
-dataset = CustomRegressionDataset("./data/Student_Performance.csv")
-# dataset_handler = DatasetHandler("./data/Student_Performance.csv")
+# dataset = CustomRegressionDataset(
+#     "./data/Student_Performance/Student_Performance_train.csv"
+# )
+# dataset_handler = DatasetHandler("./data/Student_Performance/Student_Performance")
 # %%
-dataset[0]
+# dataset[0]
 
 # %%
